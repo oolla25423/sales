@@ -1,0 +1,139 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Управление данными о продажах</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'css/styles.css' %}">
+</head>
+<body>
+    <div class="container">
+        <h1>Управление данными о продажах</h1>
+        
+        <h2>Добавить новую продажу</h2>
+        <form method="post" action="{% url 'add_sale' %}">
+            {% csrf_token %}
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="id_product_name">Название продукта:</label>
+                    {{ form.product_name }}
+                </div>
+                <div class="form-group">
+                    <label for="id_quantity">Количество:</label>
+                    {{ form.quantity }}
+                </div>
+                <div class="form-group">
+                    <label for="id_price">Цена:</label>
+                    {{ form.price }}
+                </div>
+                <div class="form-group">
+                    <label for="id_sale_date">Дата продажи:</label>
+                    {{ form.sale_date }}
+                </div>
+                <div class="form-group">
+                    <label for="id_customer_name">Имя клиента:</label>
+                    {{ form.customer_name }}
+                </div>
+                <div class="form-group">
+                    <label for="id_customer_email">Электронная почта клиента:</label>
+                    {{ form.customer_email }}
+                </div>
+                <div class="form-group">
+                    <label for="format">Сохранить как:</label>
+                    <select name="format" id="format">
+                        <option value="json">JSON</option>
+                        <option value="xml">XML</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="submit">Сохранить продажу</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    
+    <div class="container">
+        <div class="section-header">
+            <h2>Загрузить файл с данными о продажах</h2>
+        </div>
+        <form method="post" action="{% url 'upload_file' %}" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="file">Выберите JSON или XML файл:</label>
+                <input type="file" name="file" id="file" accept=".json,.xml" required>
+            </div>
+            <button type="submit">Загрузить файл</button>
+        </form>
+    </div>
+    
+    <div class="container">
+        <div class="section-header">
+            <h2>Существующие файлы</h2>
+        </div>
+        {% if json_files or xml_files %}
+            <div class="file-list">
+                {% for file in json_files %}
+                    <div class="file-item">
+                        <span>{{ file }} (JSON)</span>
+                        <div class="actions">
+                            <a href="{% url 'download_file' file %}" class="btn-secondary">Скачать</a>
+                            <a href="{% url 'delete_file' file %}" class="btn-danger" onclick="return confirm('Вы уверены, что хотите удалить этот файл?')">Удалить</a>
+                        </div>
+                    </div>
+                {% endfor %}
+                
+                {% for file in xml_files %}
+                    <div class="file-item">
+                        <span>{{ file }} (XML)</span>
+                        <div class="actions">
+                            <a href="{% url 'download_file' file %}" class="btn-secondary">Скачать</a>
+                            <a href="{% url 'delete_file' file %}" class="btn-danger" onclick="return confirm('Вы уверены, что хотите удалить этот файл?')">Удалить</a>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>Файлы не найдены.</p>
+        {% endif %}
+    </div>
+    
+    <div class="container">
+        <div class="section-header">
+            <h2>Все данные о продажах</h2>
+        </div>
+        {% if sales %}
+            <table class="compact-table">
+                <thead>
+                    <tr>
+                        <th>Продукт</th>
+                        <th>Кол-во</th>
+                        <th>Цена</th>
+                        <th>Дата</th>
+                        <th>Клиент</th>
+                        <th>Email</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sale in db_sales %}
+                        <tr>
+                            <td>{{ sale.product_name }}</td>
+                            <td>{{ sale.quantity }}</td>
+                            <td>${{ sale.price }}</td>
+                            <td>{{ sale.sale_date|date:"d.m.y H:i" }}</td>
+                            <td>{{ sale.customer_name }}</td>
+                            <td>{{ sale.customer_email }}</td>
+                            <td>
+                                <a href="{% url 'delete_sale' sale.id %}" class="delete-btn" onclick="return confirm('Вы уверены, что хотите удалить эту запись о продаже?')">Удалить</a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>Данные о продажах не найдены.</p>
+        {% endif %}
+    </div>
+</body>
+</html>
