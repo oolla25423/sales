@@ -2,17 +2,14 @@ import os
 import json
 import xml.etree.ElementTree as ET
 from datetime import datetime
-from django.shortcuts import render, redirect, get_object_or_404
-from django.http import HttpResponse, JsonResponse
+from django.shortcuts import render, redirect
+from django.http import HttpResponse
 from django.conf import settings
-from django.core.files.storage import default_storage
-from django.core.files.base import ContentFile
-from django.contrib import messages
-from .models import Sale
-from .forms import SaleForm
 import uuid
+from .forms import SaleForm
+from .models import SaleData
 
-# Define upload directory
+# Определить директорию загрузки
 UPLOAD_DIR = os.path.join(settings.BASE_DIR, 'uploads')
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -24,12 +21,7 @@ def index(request):
     json_files = [f for f in os.listdir(UPLOAD_DIR) if f.endswith('.json')]
     xml_files = [f for f in os.listdir(UPLOAD_DIR) if f.endswith('.xml')]
     
-    # Получить все продажи из базы данных
-    db_sales = Sale.objects.all()
-    for sale in db_sales:
-        sales.append(sale.to_dict())
-    
-    # Попытаться загрузить данные о продажах из файлов
+    # Загрузить данные о продажах только из файлов (не из базы данных)
     try:
         # Загрузить из JSON файлов
         for filename in json_files:
@@ -64,8 +56,7 @@ def index(request):
         'form': SaleForm(),
         'json_files': json_files,
         'xml_files': xml_files,
-        'sales': sales,
-        'db_sales': db_sales  # Передаем отдельно для возможности удаления
+        'sales': sales
     })
 
 def add_sale(request):
@@ -73,13 +64,19 @@ def add_sale(request):
     if request.method == 'POST':
         form = SaleForm(request.POST)
         if form.is_valid():
-            sale = form.save()
+            # Создать словарь данных из формы (без сохранения в базу данных)
+            sale_data = {
+                'id': str(uuid.uuid4()),
+                'product_name': form.cleaned_data['product_name'],
+                'quantity': form.cleaned_data['quantity'],
+                'price': float(form.cleaned_data['price']),
+                'sale_date': form.cleaned_data['sale_date'].isoformat(),
+                'customer_name': form.cleaned_data['customer_name'],
+                'customer_email': form.cleaned_data['customer_email']
+            }
             
             # Определить формат (JSON или XML)
             format_type = request.POST.get('format', 'json')
-            
-            # Создать словарь данных
-            sale_data = sale.to_dict()
             
             # Сгенерировать имя файла
             filename = f"sale_{uuid.uuid4().hex}.{format_type}"
@@ -187,7 +184,55 @@ def delete_file(request, filename):
     return redirect('index')
 
 def delete_sale(request, sale_id):
-    """Удалить запись о продаже из базы данных"""
-    sale = get_object_or_404(Sale, id=sale_id)
-    sale.delete()
+    """Удалить запись о продаже из файлов"""
+    # Найти и удалить файл, содержащий запись о продаже с указанным ID
+    try:
+        # Поиск в JSON файлах
+        for filename in os.listdir(UPLOAD_DIR):
+            if filename.endswith('.json'):
+                filepath = os.path.join(UPLOAD_DIR, filename)
+                try:
+                    with open(filepath, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        if isinstance(data, dict) and data.get('id') == sale_id:
+                            os.remove(filepath)
+                            break
+                        elif isinstance(data, list):
+                            # Если файл содержит список продаж, нужно удалить конкретную продажу
+                            for i, sale in enumerate(data):
+                                if isinstance(sale, dict) and sale.get('id') == sale_id:
+                                    data.pop(i)
+                                    # Перезаписать файл без удаленной продажи
+                                    with open(filepath, 'w', encoding='utf-8') as f_out:
+                                        json.dump(data, f_out, indent=2, ensure_ascii=False)
+                                    break
+                except (json.JSONDecodeError, IOError):
+                    pass
+        
+        # Поиск в XML файлах
+        for filename in os.listdir(UPLOAD_DIR):
+            if filename.endswith('.xml'):
+                filepath = os.path.join(UPLOAD_DIR, filename)
+                try:
+                    tree = ET.parse(filepath)
+                    root = tree.getroot()
+                    # Если корневой элемент - sale с нужным ID
+                    id_elem = root.find('id')
+                    if root.tag == 'sale' and id_elem is not None and id_elem.text == sale_id:
+                        os.remove(filepath)
+                    # Если корневой элемент содержит несколько sale
+                    else:
+                        deleted = False
+                        for sale_elem in root.findall('sale'):
+                            id_elem = sale_elem.find('id')
+                            if id_elem is not None and id_elem.text == sale_id:
+                                root.remove(sale_elem)
+                                deleted = True
+                        if deleted:
+                            tree.write(filepath, encoding='utf-8', xml_declaration=True)
+                except (ET.ParseError, IOError):
+                    pass
+    except Exception as e:
+        pass
+    
     return redirect('index')

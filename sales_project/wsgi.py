@@ -1,9 +1,9 @@
 """
-WSGI config for sales_project project.
+Конфигурация WSGI для проекта sales_project.
 
-It exposes the WSGI callable as a module-level variable named ``application``.
+Он предоставляет вызываемый WSGI как переменную уровня модуля с именем ``application``.
 
-For more information on this file, see
+Для получения дополнительной информации о данном файле, см.
 https://docs.djangoproject.com/en/5.2/howto/deployment/wsgi/
 """
 

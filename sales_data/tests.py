@@ -1,6 +1,6 @@
 """
-Django tests for sales_data app.
+Тесты Django для приложения sales_data.
 """
 from django.test import TestCase
 
-# Create your tests here.
+# Создайте ваши тесты здесь.

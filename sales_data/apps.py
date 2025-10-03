@@ -1,5 +1,6 @@
 from django.apps import AppConfig
 
 class SalesDataConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'
+    """Конфигурация приложения данных о продажах"""
     name = 'sales_data'
+    # Удалено default_auto_field, так как мы не используем базу данных

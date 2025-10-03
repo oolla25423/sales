@@ -1,9 +1,9 @@
 """
-ASGI config for sales_project project.
+Конфигурация ASGI для проекта sales_project.
 
-It exposes the ASGI callable as a module-level variable named ``application``.
+Он предоставляет вызываемый ASGI как переменную уровня модуля с именем ``application``.
 
-For more information on this file, see
+Для получения дополнительной информации о данном файле, см.
 https://docs.djangoproject.com/en/5.2/howto/deployment/asgi/
 """
 
