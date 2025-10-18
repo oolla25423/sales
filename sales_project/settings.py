@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Построение путей внутри проекта следующим образом: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,12 +21,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # См. https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # ПРЕДУПРЕЖДЕНИЕ БЕЗОПАСНОСТИ: храните секретный ключ, используемый в производстве, в секрете!
-SECRET_KEY = 'django-insecure-qt!4w=!5+^@ly1qu7qb!od%kqix6#q--59fhp!!nhm3+2=1=ql'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-qt!4w=!5+^@ly1qu7qb!od%kqix6#q--59fhp!!nhm3+2=1=ql')
 
 # ПРЕДУПРЕЖДЕНИЕ БЕЗОПАСНОСТИ: не запускайте с включенной отладкой в производстве!
-DEBUG = True
+DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,[::1]').split(',')
 
 
 # Определение приложения
@@ -55,10 +56,11 @@ ROOT_URLCONF = 'sales_project.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'sales_data' / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
@@ -73,8 +75,12 @@ WSGI_APPLICATION = 'sales_project.wsgi.application'
 # База данных
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# Конфигурация базы данных не требуется, так как мы не используем базу данных
-DATABASES = {}
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
+}
 
 
 # Проверка пароля
@@ -111,7 +117,9 @@ USE_TZ = True
 # Статические файлы (CSS, JavaScript, Изображения)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = os.environ.get('STATIC_ROOT', BASE_DIR / 'staticfiles')
+
 STATICFILES_DIRS = [
     BASE_DIR / 'sales_data' / 'static',
 ]
@@ -120,4 +128,4 @@ STATICFILES_DIRS = [
 # Тип поля первичного ключа по умолчанию
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
-# Удалено DEFAULT_AUTO_FIELD, так как мы не используем базу данных
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

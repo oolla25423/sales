@@ -5,136 +5,331 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Управление данными о продажах</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" type="text/css" href="{% static 'css/styles.css' %}">
+    <style>
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            margin-bottom: 0.5rem;
+            border-radius: 4px;
+        }
+        .actions a {
+            margin-left: 0.5rem;
+        }
+        .compact-table {
+            font-size: 0.9rem;
+        }
+        .compact-table th, .compact-table td {
+            padding: 0.5rem;
+        }
+        .search-container {
+            margin-bottom: 1rem;
+        }
+        .source-selector {
+            margin-bottom: 1rem;
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Управление данными о продажах</h1>
+    <div class="container mt-4">
+        <h1 class="mb-4">Управление данными о продажах</h1>
         
-        <h2>Добавить новую продажу</h2>
-        <form method="post" action="{% url 'add_sale' %}">
-            {% csrf_token %}
-            <div class="form-grid">
-                <div class="form-group">
-                    <label for="id_product_name">Название продукта:</label>
-                    {{ form.product_name }}
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
-                <div class="form-group">
-                    <label for="id_quantity">Количество:</label>
-                    {{ form.quantity }}
-                </div>
-                <div class="form-group">
-                    <label for="id_price">Цена (руб.):</label>
-                    {{ form.price }}
-                </div>
-                <div class="form-group">
-                    <label for="id_sale_date">Дата продажи:</label>
-                    {{ form.sale_date }}
-                </div>
-                <div class="form-group">
-                    <label for="id_customer_name">Имя клиента:</label>
-                    {{ form.customer_name }}
-                </div>
-                <div class="form-group">
-                    <label for="id_customer_email">Электронная почта клиента:</label>
-                    {{ form.customer_email }}
-                </div>
-                <div class="form-group">
-                    <label for="format">Сохранить как:</label>
-                    <select name="format" id="format">
-                        <option value="json">JSON</option>
-                        <option value="xml">XML</option>
-                    </select>
-                </div>
-                <div class="form-actions">
-                    <button type="submit">Сохранить продажу</button>
-                </div>
-            </div>
-        </form>
-    </div>
-    
-    <div class="container">
-        <div class="section-header">
-            <h2>Загрузить файл с данными о продажах</h2>
-        </div>
-        <form method="post" action="{% url 'upload_file' %}" enctype="multipart/form-data">
-            {% csrf_token %}
-            <div class="form-group">
-                <label for="file">Выберите JSON или XML файл:</label>
-                <input type="file" name="file" id="file" accept=".json,.xml" required>
-            </div>
-            <button type="submit">Загрузить файл</button>
-        </form>
-    </div>
-    
-    <div class="container">
-        <div class="section-header">
-            <h2>Существующие файлы</h2>
-        </div>
-        {% if json_files or xml_files %}
-            <div class="file-list">
-                {% for file in json_files %}
-                    <div class="file-item">
-                        <span>{{ file }} (JSON)</span>
-                        <div class="actions">
-                            <a href="{% url 'download_file' file %}" class="btn-secondary">Скачать</a>
-                            <a href="{% url 'delete_file' file %}" class="btn-danger" onclick="return confirm('Вы уверены, что хотите удалить этот файл?')">Удалить</a>
-                        </div>
-                    </div>
-                {% endfor %}
-                
-                {% for file in xml_files %}
-                    <div class="file-item">
-                        <span>{{ file }} (XML)</span>
-                        <div class="actions">
-                            <a href="{% url 'download_file' file %}" class="btn-secondary">Скачать</a>
-                            <a href="{% url 'delete_file' file %}" class="btn-danger" onclick="return confirm('Вы уверены, что хотите удалить этот файл?')">Удалить</a>
-                        </div>
-                    </div>
-                {% endfor %}
-            </div>
-        {% else %}
-            <p>Файлы не найдены.</p>
+            {% endfor %}
         {% endif %}
-    </div>
-    
-    <div class="container">
-        <div class="section-header">
-            <h2>Все данные о продажах</h2>
+        
+        <!-- Add Sale Form -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h2 class="h5 mb-0">Добавить новую продажу</h2>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'add_sale' %}">
+                    {% csrf_token %}
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="id_product_name">Название продукта:</label>
+                            {{ form.product_name }}
+                        </div>
+                        <div class="form-group">
+                            <label for="id_quantity">Количество:</label>
+                            {{ form.quantity }}
+                        </div>
+                        <div class="form-group">
+                            <label for="id_price">Цена (руб.):</label>
+                            {{ form.price }}
+                        </div>
+                        <div class="form-group">
+                            <label for="id_sale_date">Дата продажи:</label>
+                            {{ form.sale_date }}
+                        </div>
+                        <div class="form-group">
+                            <label for="id_customer_name">Имя клиента:</label>
+                            {{ form.customer_name }}
+                        </div>
+                        <div class="form-group">
+                            <label for="id_customer_email">Электронная почта клиента:</label>
+                            {{ form.customer_email }}
+                        </div>
+                        <div class="form-group">
+                            <label for="save_to">Сохранить в:</label>
+                            <select name="save_to" id="save_to" class="form-control">
+                                <option value="file">Файл</option>
+                                <option value="database">База данных</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="format_group">
+                            <label for="format">Формат файла:</label>
+                            <select name="format" id="format" class="form-control">
+                                <option value="json">JSON</option>
+                                <option value="xml">XML</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-success">Сохранить продажу</button>
+                    </div>
+                </form>
+            </div>
         </div>
-        {% if sales %}
-            <table class="compact-table">
-                <thead>
-                    <tr>
-                        <th>Продукт</th>
-                        <th>Кол-во</th>
-                        <th>Цена (руб.)</th>
-                        <th>Дата</th>
-                        <th>Клиент</th>
-                        <th>Email</th>
-                        <th>Действия</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for sale in sales %}
-                        <tr>
-                            <td>{{ sale.product_name }}</td>
-                            <td>{{ sale.quantity }}</td>
-                            <td>{{ sale.price }} руб.</td>
-                            <td>{{ sale.sale_date|date:"d.m.y H:i" }}</td>
-                            <td>{{ sale.customer_name }}</td>
-                            <td>{{ sale.customer_email }}</td>
+        
+        <!-- File Upload Section -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h2 class="h5 mb-0">Загрузить файл с данными о продажах</h2>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'upload_file' %}" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="file" class="form-label">Выберите JSON или XML файл:</label>
+                        <input type="file" name="file" id="file" accept=".json,.xml" required class="form-control">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Загрузить файл</button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- All Sales Data Section (from both files and database) -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h2 class="h5 mb-0">Все данные о продажах</h2>
+                <div class="search-container d-flex align-items-center">
+                    <form id="search-form" method="get" class="d-flex me-3" onsubmit="return false;">
+                        <input type="text" id="q" name="q" value="{{ search_query }}" class="form-control me-2" placeholder="Поиск по названию, клиенту, email...">
+                        <button id="search-btn" class="btn btn-outline-success">Поиск</button>
+                    </form>
+
+                    <div class="source-selector">
+                        <label for="source_select" class="form-label mb-0 me-2">Источник:</label>
+                        <select id="source_select" class="form-select">
+                            <option value="all" {% if current_source == 'all' %}selected{% endif %}>Все</option>
+                            <option value="file" {% if current_source == 'file' %}selected{% endif %}>Файлы (JSON/XML)</option>
+                            <option value="database" {% if current_source == 'database' %}selected{% endif %}>База данных</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if all_sales %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover compact-table">
+                            <thead>
+                                <tr>
+                                    <th>Продукт</th>
+                                    <th>Кол-во</th>
+                                    <th>Цена (руб.)</th>
+                                    <th>Дата</th>
+                                    <th>Клиент</th>
+                                    <th>Email</th>
+                                    <th>Источник</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for sale in all_sales %}
+                                    <tr>
+                                        <td>{{ sale.product_name }}</td>
+                                        <td>{{ sale.quantity }}</td>
+                                        <td>{{ sale.price }}</td>
+                                        <td>{{ sale.sale_date|date:"d.m.y H:i" }}</td>
+                                        <td>{{ sale.customer_name }}</td>
+                                        <td>{{ sale.customer_email }}</td>
+                                        <td>
+                                            {% if sale.source == 'database' %}
+                                                <span class="badge bg-primary">База данных</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Файл</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if sale.source == 'database' %}
+                                                <a href="{% url 'edit_sale' sale.id %}" class="btn btn-sm btn-warning">Редактировать</a>
+                                                <a href="{% url 'delete_db_sale' sale.id %}" class="btn btn-sm btn-danger" onclick="return confirm('Вы уверены, что хотите удалить эту запись?')">Удалить</a>
+                                            {% else %}
+                                                <a href="{% url 'delete_sale' sale.id %}" class="btn btn-sm btn-danger" onclick="return confirm('Вы уверены, что хотите удалить эту запись?')">Удалить</a>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted">Данные о продажах не найдены.</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Existing Files Section -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h2 class="h5 mb-0">Существующие файлы</h2>
+            </div>
+            <div class="card-body">
+                {% if json_files or xml_files %}
+                    <div class="file-list mb-4">
+                        {% for file in json_files %}
+                            <div class="file-item">
+                                <span>{{ file }} (JSON)</span>
+                                <div class="actions">
+                                    <a href="{% url 'download_file' file %}" class="btn btn-sm btn-secondary">Скачать</a>
+                                    <a href="{% url 'delete_file' file %}" class="btn btn-sm btn-danger" onclick="return confirm('Вы уверены, что хотите удалить этот файл?')">Удалить</a>
+                                </div>
+                            </div>
+                        {% endfor %}
+                        
+                        {% for file in xml_files %}
+                            <div class="file-item">
+                                <span>{{ file }} (XML)</span>
+                                <div class="actions">
+                                    <a href="{% url 'download_file' file %}" class="btn btn-sm btn-secondary">Скачать</a>
+                                    <a href="{% url 'delete_file' file %}" class="btn btn-sm btn-danger" onclick="return confirm('Вы уверены, что хотите удалить этот файл?')">Удалить</a>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted">Файлы не найдены.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        // Toggle format selection based on save location
+        document.getElementById('save_to').addEventListener('change', function() {
+            const formatGroup = document.getElementById('format_group');
+            if (this.value === 'file') {
+                formatGroup.style.display = 'block';
+            } else {
+                formatGroup.style.display = 'none';
+            }
+        });
+    </script>
+    <script>
+    (function(){
+        const searchForm = document.getElementById('search-form');
+        const qInput = document.getElementById('q');
+        const sourceSelect = document.getElementById('source_select');
+        const searchBtn = document.getElementById('search-btn');
+
+        function reloadPageWithParams() {
+            const params = new URLSearchParams();
+            if (qInput.value) params.set('q', qInput.value);
+            if (sourceSelect.value) params.set('source', sourceSelect.value);
+            location.search = params.toString();
+        }
+
+        searchBtn.addEventListener('click', function(e){
+            e.preventDefault();
+            const q = qInput.value;
+            const source = sourceSelect.value;
+
+            if (source !== 'database') {
+                // Для файлов или all — обычная перезагрузка с параметрами
+                reloadPageWithParams();
+                return;
+            }
+
+            // Для source=database выполняем AJAX запрос на серверный эндпоинт search_sales
+            const url = "{% url 'search_sales' %}?q=" + encodeURIComponent(q);
+            fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(r => {
+                    if (!r.ok) throw new Error('network');
+                    return r.json();
+                })
+                .then(data => {
+                    const tbody = document.querySelector('table.compact-table tbody');
+                    if (!tbody) {
+                        reloadPageWithParams();
+                        return;
+                    }
+                    tbody.innerHTML = '';
+                    data.sales.forEach(sale => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${sale.product_name}</td>
+                            <td>${sale.quantity}</td>
+                            <td>${sale.price}</td>
+                            <td>${new Date(sale.sale_date).toLocaleString()}</td>
+                            <td>${sale.customer_name}</td>
+                            <td>${sale.customer_email}</td>
+                            <td><span class="badge bg-primary">БД</span></td>
                             <td>
-                                <!-- Удаление продажи по ID из файлов -->
-                                <a href="{% url 'delete_sale' sale.id %}" class="delete-btn" onclick="return confirm('Вы уверены, что хотите удалить эту запись о продаже?')">Удалить</a>
+                                <a class="btn btn-sm btn-warning" href="{% url 'edit_sale' '00000000-0000-0000-0000-000000000000' %}" onclick="return true;"></a>
+                                <a class="btn btn-sm btn-danger" href="{% url 'delete_db_sale' '00000000-0000-0000-0000-000000000000' %}" onclick="return confirm('Удалить запись?')">Удалить</a>
                             </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        {% else %}
-            <p>Данные о продажах не найдены.</p>
-        {% endif %}
-    </div>
+                        `;
+                        // replace placeholder UUID in hrefs
+                        Array.from(tr.querySelectorAll('a')).forEach(a => {
+                            a.href = a.href.replace('00000000-0000-0000-0000-000000000000', sale.id);
+                        });
+                        tbody.appendChild(tr);
+                    });
+                })
+                .catch(err => {
+                    console.error(err);
+                    reloadPageWithParams();
+                });
+        });
+
+        sourceSelect.addEventListener('change', function(){
+            const src = sourceSelect.value;
+            if (src === 'database') {
+                // reload with source=database (show DB entries)
+                const params = new URLSearchParams();
+                if (qInput.value) params.set('q', qInput.value);
+                params.set('source', 'database');
+                location.search = params.toString();
+            } else {
+                reloadPageWithParams();
+            }
+        });
+    })();
+    </script>
 </body>
 </html>
