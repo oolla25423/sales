@@ -28,6 +28,28 @@ def index(request):
     # Источник отображения: all | file | database
     source = request.GET.get('source', 'all')
     
+    def _parse_date(value):
+        """Попытаться разобрать разные форматы дат в datetime.
+        Возвращает datetime при успехе или исходное значение при неудаче.
+        """
+        if not value:
+            return value
+        if isinstance(value, datetime):
+            return value
+        # Попробовать isoformat сначала
+        try:
+            return datetime.fromisoformat(value)
+        except Exception:
+            pass
+        # Попробовать несколько распространённых форматов
+        formats = ['%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%d.%m.%Y %H:%M']
+        for fmt in formats:
+            try:
+                return datetime.strptime(value, fmt)
+            except Exception:
+                continue
+        return value
+
     # Загрузить данные о продажах из файлов
     json_files = []
     xml_files = []
@@ -44,6 +66,14 @@ def index(request):
                     data = json.load(f)
                     if isinstance(data, list):
                         for item in data:
+                            # Преобразовать строку даты в объект datetime
+                            if 'sale_date' in item and isinstance(item['sale_date'], str):
+                                try:
+                                    item['sale_date'] = datetime.fromisoformat(item['sale_date'])
+                                except ValueError:
+                                    # Если не удалось преобразовать, используем функцию _parse_date
+                                    item['sale_date'] = _parse_date(item.get('sale_date'))
+                            
                             # Применить поиск, если есть запрос (без учета регистра)
                             if not search_query or (
                                 search_query_cf in str(item.get('product_name', '') or '').casefold() or
@@ -53,6 +83,14 @@ def index(request):
                                 item['source'] = 'file'
                                 sales_from_files.append(item)
                     elif isinstance(data, dict):
+                        # Преобразовать строку даты в объект datetime
+                        if 'sale_date' in data and isinstance(data['sale_date'], str):
+                            try:
+                                data['sale_date'] = datetime.fromisoformat(data['sale_date'])
+                            except ValueError:
+                                # Если не удалось преобразовать, используем функцию _parse_date
+                                data['sale_date'] = _parse_date(data.get('sale_date'))
+                        
                         # Применить поиск, если есть запрос (без учета регистра)
                         if not search_query or (
                             search_query_cf in str(data.get('product_name', '') or '').casefold() or
@@ -73,7 +111,15 @@ def index(request):
                 for sale_elem in root.findall('sale'):
                     sale_data = {}
                     for child in sale_elem:
-                        sale_data[child.tag] = child.text
+                        # Попытаться распарсить значение даты
+                        if child.tag == 'sale_date' or child.tag == 'date' or child.tag == 'created_at':
+                            sale_data[child.tag] = _parse_date(child.text)
+                        else:
+                            sale_data[child.tag] = child.text
+                    
+                    # Преобразовать строку даты в объект datetime
+                    if 'sale_date' in sale_data and isinstance(sale_data['sale_date'], str):
+                        sale_data['sale_date'] = _parse_date(sale_data['sale_date'])
                     
                     # Применить поиск, если есть запрос (без учета регистра)
                     if not search_query or (
@@ -101,7 +147,13 @@ def index(request):
             )]
         
         for sale in db_sales:
+            # Преобразовать запись модели в словарь, но оставить объект datetime для фильтра date в шаблоне
             sale_dict = sale.to_dict()
+            try:
+                sale_dict['sale_date'] = sale.sale_date
+            except Exception:
+                # если по какой-то причине нет атрибута, оставить строку
+                pass
             sale_dict['source'] = 'database'
             sales_from_db.append(sale_dict)
     except Exception as e:

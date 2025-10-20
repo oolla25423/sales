@@ -1,5 +1,10 @@
 from django.db import models
 import uuid
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from django.db.models.manager import Manager
+    from django.db.models import QuerySet
 
 # Простая структура данных для продаж (без модели базы данных)
 class SaleData:
@@ -41,6 +46,9 @@ class SaleData:
 
 # Модель Django для хранения данных о продажах в базе данных
 class Sale(models.Model):
+    if TYPE_CHECKING:
+        objects: Manager  # type: ignore
+        
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     product_name = models.CharField(max_length=200)
     quantity = models.IntegerField()
@@ -58,12 +66,15 @@ class Sale(models.Model):
     
     def to_dict(self):
         """Преобразовать экземпляр модели в словарь"""
+        from decimal import Decimal
+        # At runtime, self.price will be a Decimal and self.sale_date will be a datetime
+        # But type checkers see them as Field instances, so we need to handle both cases
         return {
             'id': str(self.id),
             'product_name': self.product_name,
             'quantity': self.quantity,
-            'price': float(self.price),
-            'sale_date': self.sale_date.isoformat(),
+            'price': float(self.price) if isinstance(self.price, Decimal) else str(self.price),  # type: ignore
+            'sale_date': self.sale_date.isoformat() if hasattr(self.sale_date, 'isoformat') else str(self.sale_date),  # type: ignore
             'customer_name': self.customer_name,
             'customer_email': self.customer_email
         }

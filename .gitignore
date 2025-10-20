@@ -172,6 +172,8 @@ staticfiles/
 .DS_Store
 Thumbs.db
 
+.qoder/rules
+
 .qoder/
 
 .qodo/

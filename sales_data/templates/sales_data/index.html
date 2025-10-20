@@ -300,7 +300,7 @@
                             <td>${sale.customer_email}</td>
                             <td><span class="badge bg-primary">БД</span></td>
                             <td>
-                                <a class="btn btn-sm btn-warning" href="{% url 'edit_sale' '00000000-0000-0000-0000-000000000000' %}" onclick="return true;"></a>
+                                <a class="btn btn-sm btn-warning" href="{% url 'edit_sale' '00000000-0000-0000-0000-000000000000' %}">Редактировать</a>
                                 <a class="btn btn-sm btn-danger" href="{% url 'delete_db_sale' '00000000-0000-0000-0000-000000000000' %}" onclick="return confirm('Удалить запись?')">Удалить</a>
                             </td>
                         `;
