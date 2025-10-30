@@ -6,42 +6,32 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse, JsonResponse
 from django.conf import settings
 from django.db.models import Q
-from django.contrib import messages
 import uuid
-from .forms import SaleForm, SaleEditForm
+from .forms import SaleForm, SaleEditForm, FileSaleForm
 from .models import SaleData, Sale
 
-# Определить директорию загрузки
 UPLOAD_DIR = os.path.join(settings.BASE_DIR, 'uploads')
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 def index(request):
-    """Главная страница с формой и списком файлов"""
     sales_from_files = []
     sales_from_db = []
     all_sales = []
     
-    # Получить поисковый запрос
     search_query = request.GET.get('q', '')
     search_query_cf = search_query.casefold() if search_query else ''
 
-    # Источник отображения: all | file | database
     source = request.GET.get('source', 'all')
     
     def _parse_date(value):
-        """Попытаться разобрать разные форматы дат в datetime.
-        Возвращает datetime при успехе или исходное значение при неудаче.
-        """
         if not value:
             return value
         if isinstance(value, datetime):
             return value
-        # Попробовать isoformat сначала
         try:
             return datetime.fromisoformat(value)
         except Exception:
             pass
-        # Попробовать несколько распространённых форматов
         formats = ['%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%d.%m.%Y %H:%M']
         for fmt in formats:
             try:
@@ -50,15 +40,12 @@ def index(request):
                 continue
         return value
 
-    # Загрузить данные о продажах из файлов
     json_files = []
     xml_files = []
     try:
-        # Получить список существующих файлов
         json_files = [f for f in os.listdir(UPLOAD_DIR) if f.endswith('.json')]
         xml_files = [f for f in os.listdir(UPLOAD_DIR) if f.endswith('.xml')]
         
-        # Загрузить из JSON файлов
         for filename in json_files:
             filepath = os.path.join(UPLOAD_DIR, filename)
             with open(filepath, 'r', encoding='utf-8') as f:
@@ -66,15 +53,12 @@ def index(request):
                     data = json.load(f)
                     if isinstance(data, list):
                         for item in data:
-                            # Преобразовать строку даты в объект datetime
                             if 'sale_date' in item and isinstance(item['sale_date'], str):
                                 try:
                                     item['sale_date'] = datetime.fromisoformat(item['sale_date'])
                                 except ValueError:
-                                    # Если не удалось преобразовать, используем функцию _parse_date
                                     item['sale_date'] = _parse_date(item.get('sale_date'))
                             
-                            # Применить поиск, если есть запрос (без учета регистра)
                             if not search_query or (
                                 search_query_cf in str(item.get('product_name', '') or '').casefold() or
                                 search_query_cf in str(item.get('customer_name', '') or '').casefold() or
@@ -83,15 +67,12 @@ def index(request):
                                 item['source'] = 'file'
                                 sales_from_files.append(item)
                     elif isinstance(data, dict):
-                        # Преобразовать строку даты в объект datetime
                         if 'sale_date' in data and isinstance(data['sale_date'], str):
                             try:
                                 data['sale_date'] = datetime.fromisoformat(data['sale_date'])
                             except ValueError:
-                                # Если не удалось преобразовать, используем функцию _parse_date
                                 data['sale_date'] = _parse_date(data.get('sale_date'))
                         
-                        # Применить поиск, если есть запрос (без учета регистра)
                         if not search_query or (
                             search_query_cf in str(data.get('product_name', '') or '').casefold() or
                             search_query_cf in str(data.get('customer_name', '') or '').casefold() or
@@ -102,7 +83,6 @@ def index(request):
                 except json.JSONDecodeError:
                     pass
         
-        # Загрузить из XML файлов
         for filename in xml_files:
             filepath = os.path.join(UPLOAD_DIR, filename)
             try:
@@ -111,17 +91,14 @@ def index(request):
                 for sale_elem in root.findall('sale'):
                     sale_data = {}
                     for child in sale_elem:
-                        # Попытаться распарсить значение даты
                         if child.tag == 'sale_date' or child.tag == 'date' or child.tag == 'created_at':
                             sale_data[child.tag] = _parse_date(child.text)
                         else:
                             sale_data[child.tag] = child.text
                     
-                    # Преобразовать строку даты в объект datetime
                     if 'sale_date' in sale_data and isinstance(sale_data['sale_date'], str):
                         sale_data['sale_date'] = _parse_date(sale_data['sale_date'])
                     
-                    # Применить поиск, если есть запрос (без учета регистра)
                     if not search_query or (
                         search_query_cf in str(sale_data.get('product_name', '') or '').casefold() or
                         search_query_cf in str(sale_data.get('customer_name', '') or '').casefold() or
@@ -134,12 +111,9 @@ def index(request):
     except Exception as e:
         pass
     
-    # Загрузить данные из базы данных
     try:
         db_sales = Sale.objects.all()
-        # Применить поиск, если есть запрос (без учета регистра)
         if search_query:
-            # Case-insensitive (Unicode-aware) filtering in Python
             db_sales = [s for s in db_sales if (
                 search_query_cf in (s.product_name or '').casefold() or
                 search_query_cf in (s.customer_name or '').casefold() or
@@ -147,19 +121,16 @@ def index(request):
             )]
         
         for sale in db_sales:
-            # Преобразовать запись модели в словарь, но оставить объект datetime для фильтра date в шаблоне
             sale_dict = sale.to_dict()
             try:
                 sale_dict['sale_date'] = sale.sale_date
             except Exception:
-                # если по какой-то причине нет атрибута, оставить строку
                 pass
             sale_dict['source'] = 'database'
             sales_from_db.append(sale_dict)
     except Exception as e:
         pass
     
-    # Объединить данные из файлов и базы данных
     if source == 'database':
         all_sales = sales_from_db
     elif source == 'file':
@@ -179,17 +150,13 @@ def index(request):
     })
 
 def add_sale(request):
-    """Добавить новую продажу через форму и сохранить как JSON/XML или в базу данных"""
     if request.method == 'POST':
         form = SaleForm(request.POST)
         if form.is_valid():
-            # Определить, куда сохранять данные: в файл или в базу данных
             save_to = request.POST.get('save_to', 'file')
             
             if save_to == 'database':
-                # Сохранить в базу данных
                 try:
-                    # Проверить на дубликаты
                     existing_sale = Sale.objects.filter(
                         product_name=form.cleaned_data['product_name'],
                         customer_email=form.cleaned_data['customer_email'],
@@ -197,9 +164,9 @@ def add_sale(request):
                     ).first()
                     
                     if existing_sale:
-                        messages.error(request, 'Запись с такими данными уже существует в базе данных.')
+                        # notification removed
+                        pass
                     else:
-                        # Создать новую запись
                         sale = Sale(
                             product_name=form.cleaned_data['product_name'],
                             quantity=form.cleaned_data['quantity'],
@@ -209,12 +176,12 @@ def add_sale(request):
                             customer_email=form.cleaned_data['customer_email']
                         )
                         sale.save()
-                        messages.success(request, 'Данные успешно сохранены в базе данных.')
+                        # notification removed
+                        pass
                 except Exception as e:
-                    messages.error(request, 'Ошибка при сохранении данных в базу данных.')
+                    # notification removed
+                    pass
             else:
-                # Сохранить в файл (JSON или XML)
-                # Создать словарь данных из формы (без сохранения в базу данных)
                 sale_data = {
                     'id': str(uuid.uuid4()),
                     'product_name': form.cleaned_data['product_name'],
@@ -225,10 +192,8 @@ def add_sale(request):
                     'customer_email': form.cleaned_data['customer_email']
                 }
                 
-                # Определить формат (JSON или XML)
                 format_type = request.POST.get('format', 'json')
                 
-                # Сгенерировать имя файла
                 filename = f"sale_{uuid.uuid4().hex}.{format_type}"
                 filepath = os.path.join(UPLOAD_DIR, filename)
                 
@@ -244,74 +209,67 @@ def add_sale(request):
                         tree = ET.ElementTree(root)
                         tree.write(filepath, encoding='utf-8', xml_declaration=True)
                     
-                    messages.success(request, f'Данные успешно сохранены в файл {filename}.')
+                    # notification removed
+                    pass
                 except Exception as e:
-                    messages.error(request, 'Ошибка при сохранении данных в файл.')
+                    # notification removed
+                    pass
             
             return redirect('index')
         else:
-            # Показываем сообщение об ошибках в форме
-            messages.error(request, 'Пожалуйста, исправьте ошибки в форме.')
+            # notification removed
+            pass
     else:
         form = SaleForm()
     
     return render(request, 'sales_data/index.html', {'form': form})
 
 def upload_file(request):
-    """Загрузить JSON или XML файл"""
     if request.method == 'POST' and request.FILES.get('file'):
         uploaded_file = request.FILES['file']
         filename = uploaded_file.name
         
-        # Очистить имя файла
         filename = "".join(c for c in filename if c.isalnum() or c in (' ', '.', '_')).rstrip()
         filename = f"{uuid.uuid4().hex}_{filename}"
         
         filepath = os.path.join(UPLOAD_DIR, filename)
         
         try:
-            # Сохранить файл
             file_content = uploaded_file.read()
             
-            # Проверить содержимое файла в зависимости от расширения
             if filename.endswith('.json'):
-                # Проверить JSON
                 json.loads(file_content.decode('utf-8'))
             elif filename.endswith('.xml'):
-                # Проверить XML
                 ET.fromstring(file_content)
             else:
-                messages.error(request, 'Неподдерживаемый формат файла.')
+                # unsupported format, notification removed
                 return redirect('index')
             
-            # Сохранить файл
             with open(filepath, 'wb') as f:
                 f.write(file_content)
             
-            messages.success(request, 'Файл успешно загружен.')
+            # notification removed
+            pass
         except (json.JSONDecodeError, ET.ParseError) as e:
-            # Удалить недействительный файл, если он был создан
             if os.path.exists(filepath):
                 os.remove(filepath)
-            messages.error(request, 'Недопустимый файл. Файл удален.')
+            # notification removed
+            pass
         except Exception as e:
-            # Удалить файл, если он был создан
             if os.path.exists(filepath):
                 os.remove(filepath)
-            messages.error(request, 'Ошибка при загрузке файла.')
+            # notification removed
+            pass
     
     return redirect('index')
 
 def download_file(request, filename):
-    """Скачать определенный файл"""
     filepath = os.path.join(UPLOAD_DIR, filename)
     
     if not os.path.exists(filepath):
-        messages.error(request, 'Файл не найден.')
         return redirect('index')
     
     if not (filename.endswith('.json') or filename.endswith('.xml')):
-        messages.error(request, 'Недопустимый файл.')
         return redirect('index')
     
     with open(filepath, 'rb') as f:
@@ -320,22 +278,18 @@ def download_file(request, filename):
         return response
 
 def delete_file(request, filename):
-    """Удалить определенный файл"""
     filepath = os.path.join(UPLOAD_DIR, filename)
     
     if os.path.exists(filepath):
         os.remove(filepath)
-        messages.success(request, 'Файл успешно удален.')
     else:
-        messages.error(request, 'Файл не найден.')
+        # notification removed
+        pass
     
     return redirect('index')
 
 def delete_sale(request, sale_id):
-    """Удалить запись о продаже из файлов"""
-    # Найти и удалить файл, содержащий запись о продаже с указанным ID
     try:
-        # Поиск в JSON файлах
         for filename in os.listdir(UPLOAD_DIR):
             if filename.endswith('.json'):
                 filepath = os.path.join(UPLOAD_DIR, filename)
@@ -344,34 +298,27 @@ def delete_sale(request, sale_id):
                         data = json.load(f)
                         if isinstance(data, dict) and data.get('id') == sale_id:
                             os.remove(filepath)
-                            messages.success(request, 'Запись успешно удалена.')
                             break
                         elif isinstance(data, list):
-                            # Если файл содержит список продаж, нужно удалить конкретную продажу
                             for i, sale in enumerate(data):
                                 if isinstance(sale, dict) and sale.get('id') == sale_id:
                                     data.pop(i)
-                                    # Перезаписать файл без удаленной продажи
                                     with open(filepath, 'w', encoding='utf-8') as f_out:
                                         json.dump(data, f_out, indent=2, ensure_ascii=False)
-                                    messages.success(request, 'Запись успешно удалена.')
+                                    
                                     break
                 except (json.JSONDecodeError, IOError):
                     pass
         
-        # Поиск в XML файлах
         for filename in os.listdir(UPLOAD_DIR):
             if filename.endswith('.xml'):
                 filepath = os.path.join(UPLOAD_DIR, filename)
                 try:
                     tree = ET.parse(filepath)
                     root = tree.getroot()
-                    # Если корневой элемент - sale с нужным ID
                     id_elem = root.find('id')
                     if root.tag == 'sale' and id_elem is not None and id_elem.text == sale_id:
                         os.remove(filepath)
-                        messages.success(request, 'Запись успешно удалена.')
-                    # Если корневой элемент содержит несколько sale
                     else:
                         deleted = False
                         for sale_elem in root.findall('sale'):
@@ -381,23 +328,19 @@ def delete_sale(request, sale_id):
                                 deleted = True
                         if deleted:
                             tree.write(filepath, encoding='utf-8', xml_declaration=True)
-                            messages.success(request, 'Запись успешно удалена.')
                 except (ET.ParseError, IOError):
                     pass
     except Exception as e:
-        messages.error(request, 'Ошибка при удалении записи.')
+        # notification removed
+        pass
     
     return redirect('index')
 
-# Новые функции для работы с базой данных
-
 def search_sales(request):
-    """AJAX поиск по записям в базе данных"""
     query = request.GET.get('q', '')
     sales = Sale.objects.all()
     
     if query:
-        # Case-insensitive (Unicode-aware) filtering in Python
         query_cf = query.casefold()
         sales = [s for s in sales if (
             query_cf in (s.product_name or '').casefold() or
@@ -405,19 +348,16 @@ def search_sales(request):
             query_cf in (s.customer_email or '').casefold()
         )]
     
-    # Преобразовать в список словарей для JSON ответа
     sales_data = [sale.to_dict() for sale in sales]
     
     return JsonResponse({'sales': sales_data})
 
 def edit_sale(request, sale_id):
-    """Редактировать запись о продаже в базе данных"""
     sale = get_object_or_404(Sale, id=sale_id)
     
     if request.method == 'POST':
         form = SaleEditForm(request.POST, instance=sale)
         if form.is_valid():
-            # Проверить на дубликаты (кроме текущей записи)
             existing_sale = Sale.objects.filter(
                 product_name=form.cleaned_data['product_name'],
                 customer_email=form.cleaned_data['customer_email'],
@@ -425,10 +365,10 @@ def edit_sale(request, sale_id):
             ).exclude(id=sale_id).first()
             
             if existing_sale:
-                messages.error(request, 'Запись с такими данными уже существует в базе данных.')
+                # notification removed
+                pass
             else:
                 form.save()
-                messages.success(request, 'Запись успешно обновлена.')
                 return redirect('index')
     else:
         form = SaleEditForm(instance=sale)
@@ -436,8 +376,143 @@ def edit_sale(request, sale_id):
     return render(request, 'sales_data/edit_sale.html', {'form': form, 'sale': sale})
 
 def delete_db_sale(request, sale_id):
-    """Удалить запись о продаже из базы данных"""
     sale = get_object_or_404(Sale, id=sale_id)
     sale.delete()
-    messages.success(request, 'Запись успешно удалена из базы данных.')
     return redirect('index')
+
+def edit_file_sale(request, sale_id):
+    sale_data = None
+    sale_file_path = None
+    file_format = None
+    
+    for filename in os.listdir(UPLOAD_DIR):
+        if filename.endswith('.json'):
+            filepath = os.path.join(UPLOAD_DIR, filename)
+            try:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    if isinstance(data, dict) and data.get('id') == sale_id:
+                        sale_data = data
+                        sale_file_path = filepath
+                        file_format = 'json'
+                        break
+                    elif isinstance(data, list):
+                        for sale in data:
+                            if isinstance(sale, dict) and sale.get('id') == sale_id:
+                                sale_data = sale
+                                sale_file_path = filepath
+                                file_format = 'json'
+                                break
+                        if sale_data:
+                            break
+            except (json.JSONDecodeError, IOError):
+                pass
+    
+    if not sale_data:
+        for filename in os.listdir(UPLOAD_DIR):
+            if filename.endswith('.xml'):
+                filepath = os.path.join(UPLOAD_DIR, filename)
+                try:
+                    tree = ET.parse(filepath)
+                    root = tree.getroot()
+                    
+                    def xml_to_dict(elem):
+                        result = {}
+                        for child in elem:
+                            result[child.tag] = child.text
+                        return result
+                    
+                    if root.tag == 'sale':
+                        data = xml_to_dict(root)
+                        if data.get('id') == sale_id:
+                            sale_data = data
+                            sale_file_path = filepath
+                            file_format = 'xml'
+                            break
+                    else:
+                        for sale_elem in root.findall('sale'):
+                            data = xml_to_dict(sale_elem)
+                            if data.get('id') == sale_id:
+                                sale_data = data
+                                sale_file_path = filepath
+                                file_format = 'xml'
+                                break
+                        if sale_data:
+                            break
+                except (ET.ParseError, IOError):
+                    pass
+    
+    if not sale_data or not sale_file_path:
+        # notification removed
+        return redirect('index')
+    
+    if request.method == 'POST':
+        form = FileSaleForm(request.POST)
+        if form.is_valid():
+            sale_date = form.cleaned_data['sale_date']
+            if sale_date.tzinfo is None:
+                sale_date = sale_date.replace(tzinfo=datetime.now().astimezone().tzinfo)
+            
+            updated_data = {
+                'id': sale_id,
+                'product_name': form.cleaned_data['product_name'],
+                'quantity': form.cleaned_data['quantity'],
+                'price': float(form.cleaned_data['price']),
+                'sale_date': sale_date.isoformat(),
+                'customer_name': form.cleaned_data['customer_name'],
+                'customer_email': form.cleaned_data['customer_email']
+            }
+            
+            try:
+                if file_format == 'json':
+                    with open(sale_file_path, 'r', encoding='utf-8') as f:
+                        file_data = json.load(f)
+                        
+                    if isinstance(file_data, dict):
+                        file_data = updated_data
+                    else:
+                        for i, item in enumerate(file_data):
+                            if item.get('id') == sale_id:
+                                file_data[i] = updated_data
+                                break
+                    
+                    with open(sale_file_path, 'w', encoding='utf-8') as f:
+                        json.dump(file_data, f, indent=2, ensure_ascii=False)
+                else:  # xml
+                    tree = ET.parse(sale_file_path)
+                    root = tree.getroot()
+                    
+                    def update_xml_element(elem, data):
+                        for key, value in data.items():
+                            child = elem.find(key)
+                            if child is None:
+                                child = ET.SubElement(elem, key)
+                            child.text = str(value)
+                    
+                    if root.tag == 'sale':
+                        update_xml_element(root, updated_data)
+                    else:
+                        for sale_elem in root.findall('sale'):
+                            if sale_elem.find('id').text == sale_id:
+                                update_xml_element(sale_elem, updated_data)
+                                break
+                    
+                    tree.write(sale_file_path, encoding='utf-8', xml_declaration=True)
+                
+                # notification removed
+                return redirect('index')
+            except Exception as e:
+                # notification removed
+                pass
+    else:
+        if isinstance(sale_data.get('sale_date'), str):
+            try:
+                date_obj = datetime.fromisoformat(sale_data['sale_date'])
+            except ValueError:
+                date_obj = _parse_date(sale_data['sale_date'])
+            
+            sale_data['sale_date'] = date_obj.strftime('%Y-%m-%dT%H:%M')
+        
+        form = FileSaleForm(initial=sale_data)
+    
+    return render(request, 'sales_data/edit_file_sale.html', {'form': form, 'sale_id': sale_id})

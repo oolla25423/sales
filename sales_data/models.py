@@ -6,9 +6,7 @@ if TYPE_CHECKING:
     from django.db.models.manager import Manager
     from django.db.models import QuerySet
 
-# Простая структура данных для продаж (без модели базы данных)
 class SaleData:
-    """Класс для представления данных о продаже без использования базы данных"""
     
     def __init__(self, id, product_name, quantity, price, sale_date, customer_name, customer_email):
         self.id = id
@@ -20,7 +18,6 @@ class SaleData:
         self.customer_email = customer_email
     
     def to_dict(self):
-        """Преобразовать экземпляр в словарь для сериализации"""
         return {
             'id': self.id,
             'product_name': self.product_name,
@@ -33,7 +30,6 @@ class SaleData:
     
     @classmethod
     def from_dict(cls, data):
-        """Создать экземпляр из словаря"""
         return cls(
             id=data.get('id'),
             product_name=data.get('product_name'),
@@ -44,7 +40,6 @@ class SaleData:
             customer_email=data.get('customer_email')
         )
 
-# Модель Django для хранения данных о продажах в базе данных
 class Sale(models.Model):
     if TYPE_CHECKING:
         objects: Manager  # type: ignore
@@ -65,10 +60,7 @@ class Sale(models.Model):
         return f"{self.product_name} - {self.customer_name}"
     
     def to_dict(self):
-        """Преобразовать экземпляр модели в словарь"""
         from decimal import Decimal
-        # At runtime, self.price will be a Decimal and self.sale_date will be a datetime
-        # But type checkers see them as Field instances, so we need to handle both cases
         return {
             'id': str(self.id),
             'product_name': self.product_name,

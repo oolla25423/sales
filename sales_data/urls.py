@@ -1,7 +1,7 @@
 from django.urls import path
 from . import views
 
-"""URL-паттерны для приложения данных о продажах"""
+
 urlpatterns = [
     path('', views.index, name='index'),
     path('add_sale/', views.add_sale, name='add_sale'),
@@ -12,4 +12,5 @@ urlpatterns = [
     path('search_sales/', views.search_sales, name='search_sales'),
     path('edit_sale/<uuid:sale_id>/', views.edit_sale, name='edit_sale'),
     path('delete_db_sale/<uuid:sale_id>/', views.delete_db_sale, name='delete_db_sale'),
+    path('edit_file_sale/<str:sale_id>/', views.edit_file_sale, name='edit_file_sale'),
 ]

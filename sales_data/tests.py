@@ -7,7 +7,6 @@ from datetime import datetime
 
 class SaleModelTest(TestCase):
     def setUp(self):
-        """Создать тестовую запись о продаже"""
         self.sale = Sale.objects.create(
             product_name="Тестовый продукт",
             quantity=5,
@@ -18,12 +17,10 @@ class SaleModelTest(TestCase):
         )
     
     def test_sale_creation(self):
-        """Тест создания записи о продаже"""
         self.assertTrue(isinstance(self.sale, Sale))
         self.assertEqual(str(self.sale), "Тестовый продукт - Тестовый клиент")
     
     def test_sale_to_dict(self):
-        """Тест преобразования записи в словарь"""
         sale_dict = self.sale.to_dict()
         self.assertIsInstance(sale_dict, dict)
         self.assertIn('product_name', sale_dict)
@@ -35,7 +32,6 @@ class SaleModelTest(TestCase):
 
 class SaleFormTest(TestCase):
     def test_sale_form_valid_data(self):
-        """Тест формы с валидными данными"""
         form_data = {
             'product_name': 'Тестовый продукт',
             'quantity': 5,
@@ -48,14 +44,13 @@ class SaleFormTest(TestCase):
         self.assertTrue(form.is_valid())
     
     def test_sale_form_invalid_data(self):
-        """Тест формы с невалидными данными"""
         form_data = {
             'product_name': 'Тестовый продукт',
-            'quantity': -1,  # Невалидное количество
+            'quantity': -1,
             'price': 100.50,
             'sale_date': datetime.now(),
             'customer_name': 'Тестовый клиент',
-            'customer_email': 'invalid-email'  # Невалидный email
+            'customer_email': 'invalid-email'
         }
         form = SaleForm(data=form_data)
         self.assertFalse(form.is_valid())
