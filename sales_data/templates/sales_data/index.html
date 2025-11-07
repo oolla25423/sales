@@ -197,32 +197,28 @@
     });
 </script>
 <script>
+// Unified AJAX search: делает запрос к search_sales и обновляет таблицу без перезагрузки
 (function(){
     const searchForm = document.getElementById('search-form');
     const qInput = document.getElementById('q');
     const sourceSelect = document.getElementById('source_select');
     const searchBtn = document.getElementById('search-btn');
 
-    function reloadPageWithParams() {
-        const params = new URLSearchParams();
-        if (qInput.value) params.set('q', qInput.value);
-        if (sourceSelect.value) params.set('source', sourceSelect.value);
-        location.search = params.toString();
+    // URL-шаблоны для замены placeholder'а UUID/ID
+    const editSaleUrlTemplate = "{% url 'edit_sale' '00000000-0000-0000-0000-000000000000' %}";
+    const deleteDbSaleUrlTemplate = "{% url 'delete_db_sale' '00000000-0000-0000-0000-000000000000' %}";
+    const editFileSaleUrlTemplate = "{% url 'edit_file_sale' '00000000-0000-0000-0000-000000000000' %}";
+    const deleteFileSaleUrlTemplate = "{% url 'delete_sale' '00000000-0000-0000-0000-000000000000' %}";
+
+    function buildUrl(template, id) {
+        return template.replace('00000000-0000-0000-0000-000000000000', id);
     }
 
-    searchBtn.addEventListener('click', function(e){
-        e.preventDefault();
+    function performAjaxSearch() {
         const q = qInput.value;
-        const source = sourceSelect.value;
+        const source = sourceSelect.value || 'all';
+        const url = "{% url 'search_sales' %}?q=" + encodeURIComponent(q) + '&source=' + encodeURIComponent(source);
 
-        if (source !== 'database') {
-            // Для файлов или all — обычная перезагрузка с параметрами
-            reloadPageWithParams();
-            return;
-        }
-
-        // Для source=database выполняем AJAX запрос на серверный эндпоинт search_sales
-        const url = "{% url 'search_sales' %}?q=" + encodeURIComponent(q);
         fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
             .then(r => {
                 if (!r.ok) throw new Error('network');
@@ -231,49 +227,63 @@
             .then(data => {
                 const tbody = document.querySelector('table.compact-table tbody');
                 if (!tbody) {
-                    reloadPageWithParams();
+                    // если таблицы нет — простая перезагрузка
+                    const params = new URLSearchParams();
+                    if (q) params.set('q', q);
+                    if (source) params.set('source', source);
+                    location.search = params.toString();
                     return;
                 }
                 tbody.innerHTML = '';
                 data.sales.forEach(sale => {
                     const tr = document.createElement('tr');
+                    const saleDate = sale.sale_date ? new Date(sale.sale_date).toLocaleString() : '';
+                    const sourceBadge = sale.source === 'database' ? '<span class="badge bg-primary">База данных</span>' : '<span class="badge bg-secondary">Файл</span>';
+
+                    let actionsHtml = '';
+                    if (sale.source === 'database') {
+                        actionsHtml = `
+                            <a class="btn btn-sm btn-warning" href="${buildUrl(editSaleUrlTemplate, sale.id)}">Редактировать</a>
+                            <a class="btn btn-sm btn-danger" href="${buildUrl(deleteDbSaleUrlTemplate, sale.id)}" onclick="return confirm('Удалить запись?')">Удалить</a>
+                        `;
+                    } else {
+                        actionsHtml = `
+                            <a class="btn btn-sm btn-warning" href="${buildUrl(editFileSaleUrlTemplate, sale.id)}">Редактировать</a>
+                            <a class="btn btn-sm btn-danger" href="${buildUrl(deleteFileSaleUrlTemplate, sale.id)}" onclick="return confirm('Вы уверены, что хотите удалить эту запись?')">Удалить</a>
+                        `;
+                    }
+
                     tr.innerHTML = `
-                        <td>${sale.product_name}</td>
-                        <td>${sale.quantity}</td>
-                        <td>${sale.price}</td>
-                        <td>${new Date(sale.sale_date).toLocaleString()}</td>
-                        <td>${sale.customer_name}</td>
-                        <td>${sale.customer_email}</td>
-                        <td><span class="badge bg-primary">БД</span></td>
-                        <td>
-                            <a class="btn btn-sm btn-warning" href="{% url 'edit_sale' '00000000-0000-0000-0000-000000000000' %}">Редактировать</a>
-                            <a class="btn btn-sm btn-danger" href="{% url 'delete_db_sale' '00000000-0000-0000-0000-000000000000' %}" onclick="return confirm('Удалить запись?')">Удалить</a>
-                        </td>
+                        <td>${sale.product_name || ''}</td>
+                        <td>${sale.quantity || ''}</td>
+                        <td>${sale.price || ''}</td>
+                        <td>${saleDate}</td>
+                        <td>${sale.customer_name || ''}</td>
+                        <td>${sale.customer_email || ''}</td>
+                        <td>${sourceBadge}</td>
+                        <td>${actionsHtml}</td>
                     `;
-                    // replace placeholder UUID in hrefs
-                    Array.from(tr.querySelectorAll('a')).forEach(a => {
-                        a.href = a.href.replace('00000000-0000-0000-0000-000000000000', sale.id);
-                    });
                     tbody.appendChild(tr);
                 });
             })
             .catch(err => {
                 console.error(err);
-                reloadPageWithParams();
+                // при ошибке падаем назад к поведению со стандартной перезагрузкой
+                const params = new URLSearchParams();
+                if (qInput.value) params.set('q', qInput.value);
+                if (sourceSelect.value) params.set('source', sourceSelect.value);
+                location.search = params.toString();
             });
+    }
+
+    searchBtn.addEventListener('click', function(e){
+        e.preventDefault();
+        performAjaxSearch();
     });
 
     sourceSelect.addEventListener('change', function(){
-        const src = sourceSelect.value;
-        if (src === 'database') {
-            // reload with source=database (show DB entries)
-            const params = new URLSearchParams();
-            if (qInput.value) params.set('q', qInput.value);
-            params.set('source', 'database');
-            location.search = params.toString();
-        } else {
-            reloadPageWithParams();
-        }
+        // при смене источника выполняем AJAX-поиск (или перезагрузку, если таблицы нет)
+        performAjaxSearch();
     });
 })();
 </script>

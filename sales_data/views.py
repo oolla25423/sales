@@ -337,20 +337,104 @@ def delete_sale(request, sale_id):
     return redirect('index')
 
 def search_sales(request):
+    """AJAX endpoint: возвращает список продаж в JSON.
+    Параметры:
+    - q: строка поиска
+    - source: 'database' | 'file' | 'all' (по умолчанию 'all')
+    Возвращает {'sales': [ ... ]} — список словарей с полями продажи.
+    """
     query = request.GET.get('q', '')
-    sales = Sale.objects.all()
-    
-    if query:
-        query_cf = query.casefold()
-        sales = [s for s in sales if (
-            query_cf in (s.product_name or '').casefold() or
-            query_cf in (s.customer_name or '').casefold() or
-            query_cf in (s.customer_email or '').casefold()
-        )]
-    
-    sales_data = [sale.to_dict() for sale in sales]
-    
-    return JsonResponse({'sales': sales_data})
+    source = request.GET.get('source', 'all')
+    query_cf = query.casefold() if query else ''
+
+    results = []
+
+    # Helper: matches search query against a sale dict-like object
+    def matches(item):
+        if not query_cf:
+            return True
+        return (
+            query_cf in str(item.get('product_name', '') or '').casefold() or
+            query_cf in str(item.get('customer_name', '') or '').casefold() or
+            query_cf in str(item.get('customer_email', '') or '').casefold()
+        )
+
+    # If source includes files, scan UPLOAD_DIR for JSON/XML and collect matching items
+    if source in ('file', 'all'):
+        try:
+            for filename in os.listdir(UPLOAD_DIR):
+                filepath = os.path.join(UPLOAD_DIR, filename)
+                if filename.endswith('.json'):
+                    try:
+                        with open(filepath, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                        if isinstance(data, list):
+                            for item in data:
+                                if isinstance(item, dict) and matches(item):
+                                    item_copy = dict(item)
+                                    item_copy['source'] = 'file'
+                                    results.append(item_copy)
+                        elif isinstance(data, dict):
+                            if matches(data):
+                                data_copy = dict(data)
+                                data_copy['source'] = 'file'
+                                results.append(data_copy)
+                    except (json.JSONDecodeError, IOError):
+                        continue
+                elif filename.endswith('.xml'):
+                    try:
+                        tree = ET.parse(filepath)
+                        root = tree.getroot()
+
+                        def xml_to_dict(elem):
+                            d = {}
+                            for child in elem:
+                                d[child.tag] = child.text
+                            return d
+
+                        # single <sale/> root
+                        if root.tag == 'sale':
+                            item = xml_to_dict(root)
+                            if matches(item):
+                                item['source'] = 'file'
+                                results.append(item)
+                        else:
+                            for sale_elem in root.findall('sale'):
+                                item = xml_to_dict(sale_elem)
+                                if matches(item):
+                                    item['source'] = 'file'
+                                    results.append(item)
+                    except (ET.ParseError, IOError):
+                        continue
+        except Exception:
+            # не фатально — просто ничего не добавляем из файлов
+            pass
+
+    # If source includes database, query Sale objects
+    if source in ('database', 'all'):
+        try:
+            db_qs = Sale.objects.all()
+            # Если есть текст поиска — применим фильтрацию на уровне Python (оставлено для простоты)
+            if query_cf:
+                db_qs = [s for s in db_qs if (
+                    query_cf in (s.product_name or '').casefold() or
+                    query_cf in (s.customer_name or '').casefold() or
+                    query_cf in (s.customer_email or '').casefold()
+                )]
+
+            for s in db_qs:
+                d = s.to_dict()
+                # гарантируем, что sale_date — строка в ISO формате
+                try:
+                    d['sale_date'] = s.sale_date.isoformat()
+                except Exception:
+                    pass
+                d['source'] = 'database'
+                results.append(d)
+        except Exception:
+            pass
+
+    return JsonResponse({'sales': results})
 
 def edit_sale(request, sale_id):
     sale = get_object_or_404(Sale, id=sale_id)
