@@ -6,6 +6,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse, JsonResponse
 from django.conf import settings
 from django.db.models import Q
+from django.contrib import messages
 import uuid
 from .forms import SaleForm, SaleEditForm, FileSaleForm
 from .models import SaleData, Sale
@@ -88,9 +89,14 @@ def index(request):
             try:
                 tree = ET.parse(filepath)
                 root = tree.getroot()
-                for sale_elem in root.findall('sale'):
+                
+                # Handle both formats:
+                # 1. Root is 'sale' with data as children (single sale file)
+                # 2. Root contains multiple 'sale' children (multiple sales file)
+                if root.tag == 'sale':
+                    # Single sale format - root is the sale element
                     sale_data = {}
-                    for child in sale_elem:
+                    for child in root:
                         if child.tag == 'sale_date' or child.tag == 'date' or child.tag == 'created_at':
                             sale_data[child.tag] = _parse_date(child.text)
                         else:
@@ -106,10 +112,30 @@ def index(request):
                     ):
                         sale_data['source'] = 'file'
                         sales_from_files.append(sale_data)
+                else:
+                    # Multiple sales format - root contains sale elements
+                    for sale_elem in root.findall('sale'):
+                        sale_data = {}
+                        for child in sale_elem:
+                            if child.tag == 'sale_date' or child.tag == 'date' or child.tag == 'created_at':
+                                sale_data[child.tag] = _parse_date(child.text)
+                            else:
+                                sale_data[child.tag] = child.text
+                        
+                        if 'sale_date' in sale_data and isinstance(sale_data['sale_date'], str):
+                            sale_data['sale_date'] = _parse_date(sale_data['sale_date'])
+                        
+                        if not search_query or (
+                            search_query_cf in str(sale_data.get('product_name', '') or '').casefold() or
+                            search_query_cf in str(sale_data.get('customer_name', '') or '').casefold() or
+                            search_query_cf in str(sale_data.get('customer_email', '') or '').casefold()
+                        ):
+                            sale_data['source'] = 'file'
+                            sales_from_files.append(sale_data)
             except ET.ParseError:
                 pass
     except Exception as e:
-        pass
+        messages.error(request, f"Error reading files: {str(e)}")
     
     try:
         db_sales = Sale.objects.all()
@@ -129,7 +155,7 @@ def index(request):
             sale_dict['source'] = 'database'
             sales_from_db.append(sale_dict)
     except Exception as e:
-        pass
+        messages.error(request, f"Error reading database: {str(e)}")
     
     if source == 'database':
         all_sales = sales_from_db
@@ -164,8 +190,7 @@ def add_sale(request):
                     ).first()
                     
                     if existing_sale:
-                        # notification removed
-                        pass
+                        messages.warning(request, 'A sale with the same product, customer email, and date already exists in the database.')
                     else:
                         sale = Sale(
                             product_name=form.cleaned_data['product_name'],
@@ -176,11 +201,9 @@ def add_sale(request):
                             customer_email=form.cleaned_data['customer_email']
                         )
                         sale.save()
-                        # notification removed
-                        pass
+                        messages.success(request, 'Sale successfully added to database.')
                 except Exception as e:
-                    # notification removed
-                    pass
+                    messages.error(request, f'Error saving to database: {str(e)}')
             else:
                 sale_data = {
                     'id': str(uuid.uuid4()),
@@ -209,16 +232,13 @@ def add_sale(request):
                         tree = ET.ElementTree(root)
                         tree.write(filepath, encoding='utf-8', xml_declaration=True)
                     
-                    # notification removed
-                    pass
+                    messages.success(request, f'Sale successfully saved to {format_type.upper()} file.')
                 except Exception as e:
-                    # notification removed
-                    pass
+                    messages.error(request, f'Error saving to file: {str(e)}')
             
             return redirect('index')
         else:
-            # notification removed
-            pass
+            messages.error(request, 'Please correct the errors below.')
     else:
         form = SaleForm()
     
@@ -242,24 +262,21 @@ def upload_file(request):
             elif filename.endswith('.xml'):
                 ET.fromstring(file_content)
             else:
-                # unsupported format, notification removed
+                messages.error(request, 'Unsupported file format. Please upload JSON or XML files only.')
                 return redirect('index')
             
             with open(filepath, 'wb') as f:
                 f.write(file_content)
             
-            # notification removed
-            pass
+            messages.success(request, f'File {filename} uploaded successfully.')
         except (json.JSONDecodeError, ET.ParseError) as e:
             if os.path.exists(filepath):
                 os.remove(filepath)
-            # notification removed
-            pass
+            messages.error(request, f'Invalid file format: {str(e)}')
         except Exception as e:
             if os.path.exists(filepath):
                 os.remove(filepath)
-            # notification removed
-            pass
+            messages.error(request, f'Error uploading file: {str(e)}')
     
     return redirect('index')
 
@@ -267,9 +284,11 @@ def download_file(request, filename):
     filepath = os.path.join(UPLOAD_DIR, filename)
     
     if not os.path.exists(filepath):
+        messages.error(request, 'File not found.')
         return redirect('index')
     
     if not (filename.endswith('.json') or filename.endswith('.xml')):
+        messages.error(request, 'Invalid file type.')
         return redirect('index')
     
     with open(filepath, 'rb') as f:
@@ -282,13 +301,14 @@ def delete_file(request, filename):
     
     if os.path.exists(filepath):
         os.remove(filepath)
+        messages.success(request, f'File {filename} deleted successfully.')
     else:
-        # notification removed
-        pass
+        messages.error(request, 'File not found.')
     
     return redirect('index')
 
 def delete_sale(request, sale_id):
+    deleted = False  # Initialize the variable
     try:
         for filename in os.listdir(UPLOAD_DIR):
             if filename.endswith('.json'):
@@ -298,6 +318,7 @@ def delete_sale(request, sale_id):
                         data = json.load(f)
                         if isinstance(data, dict) and data.get('id') == sale_id:
                             os.remove(filepath)
+                            deleted = True
                             break
                         elif isinstance(data, list):
                             for i, sale in enumerate(data):
@@ -306,6 +327,7 @@ def delete_sale(request, sale_id):
                                     with open(filepath, 'w', encoding='utf-8') as f_out:
                                         json.dump(data, f_out, indent=2, ensure_ascii=False)
                                     
+                                    deleted = True
                                     break
                 except (json.JSONDecodeError, IOError):
                     pass
@@ -319,20 +341,23 @@ def delete_sale(request, sale_id):
                     id_elem = root.find('id')
                     if root.tag == 'sale' and id_elem is not None and id_elem.text == sale_id:
                         os.remove(filepath)
+                        deleted = True
                     else:
-                        deleted = False
                         for sale_elem in root.findall('sale'):
                             id_elem = sale_elem.find('id')
                             if id_elem is not None and id_elem.text == sale_id:
                                 root.remove(sale_elem)
+                                tree.write(filepath, encoding='utf-8', xml_declaration=True)
                                 deleted = True
-                        if deleted:
-                            tree.write(filepath, encoding='utf-8', xml_declaration=True)
                 except (ET.ParseError, IOError):
                     pass
     except Exception as e:
-        # notification removed
-        pass
+        messages.error(request, f'Error deleting sale: {str(e)}')
+    
+    if deleted:
+        messages.success(request, 'Sale deleted successfully.')
+    else:
+        messages.error(request, 'Sale not found.')
     
     return redirect('index')
 
@@ -358,6 +383,24 @@ def search_sales(request):
             query_cf in str(item.get('customer_name', '') or '').casefold() or
             query_cf in str(item.get('customer_email', '') or '').casefold()
         )
+    
+    # Date parsing helper
+    def _parse_date(value):
+        if not value:
+            return value
+        if isinstance(value, datetime):
+            return value
+        try:
+            return datetime.fromisoformat(value)
+        except Exception:
+            pass
+        formats = ['%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%d.%m.%Y %H:%M']
+        for fmt in formats:
+            try:
+                return datetime.strptime(value, fmt)
+            except Exception:
+                continue
+        return value
 
     # If source includes files, scan UPLOAD_DIR for JSON/XML and collect matching items
     if source in ('file', 'all'):
@@ -386,24 +429,40 @@ def search_sales(request):
                         tree = ET.parse(filepath)
                         root = tree.getroot()
 
-                        def xml_to_dict(elem):
-                            d = {}
-                            for child in elem:
-                                d[child.tag] = child.text
-                            return d
-
-                        # single <sale/> root
+                        # Handle both formats:
+                        # 1. Root is 'sale' with data as children (single sale file)
+                        # 2. Root contains multiple 'sale' children (multiple sales file)
                         if root.tag == 'sale':
-                            item = xml_to_dict(root)
-                            if matches(item):
-                                item['source'] = 'file'
-                                results.append(item)
+                            # Single sale format - root is the sale element
+                            sale_data = {}
+                            for child in root:
+                                if child.tag == 'sale_date' or child.tag == 'date' or child.tag == 'created_at':
+                                    sale_data[child.tag] = _parse_date(child.text)
+                                else:
+                                    sale_data[child.tag] = child.text
+                            
+                            if 'sale_date' in sale_data and isinstance(sale_data['sale_date'], str):
+                                sale_data['sale_date'] = _parse_date(sale_data['sale_date'])
+                            
+                            if matches(sale_data):
+                                sale_data['source'] = 'file'
+                                results.append(sale_data)
                         else:
+                            # Multiple sales format - root contains sale elements
                             for sale_elem in root.findall('sale'):
-                                item = xml_to_dict(sale_elem)
-                                if matches(item):
-                                    item['source'] = 'file'
-                                    results.append(item)
+                                sale_data = {}
+                                for child in sale_elem:
+                                    if child.tag == 'sale_date' or child.tag == 'date' or child.tag == 'created_at':
+                                        sale_data[child.tag] = _parse_date(child.text)
+                                    else:
+                                        sale_data[child.tag] = child.text
+                                
+                                if 'sale_date' in sale_data and isinstance(sale_data['sale_date'], str):
+                                    sale_data['sale_date'] = _parse_date(sale_data['sale_date'])
+                                
+                                if matches(sale_data):
+                                    sale_data['source'] = 'file'
+                                    results.append(sale_data)
                     except (ET.ParseError, IOError):
                         continue
         except Exception:
@@ -449,10 +508,10 @@ def edit_sale(request, sale_id):
             ).exclude(id=sale_id).first()
             
             if existing_sale:
-                # notification removed
-                pass
+                messages.warning(request, 'A sale with the same product, customer email, and date already exists.')
             else:
                 form.save()
+                messages.success(request, 'Sale updated successfully.')
                 return redirect('index')
     else:
         form = SaleEditForm(instance=sale)
@@ -462,12 +521,31 @@ def edit_sale(request, sale_id):
 def delete_db_sale(request, sale_id):
     sale = get_object_or_404(Sale, id=sale_id)
     sale.delete()
+    messages.success(request, 'Sale deleted successfully.')
     return redirect('index')
 
 def edit_file_sale(request, sale_id):
     sale_data = None
     sale_file_path = None
     file_format = None
+    
+    # Define _parse_date function for local use
+    def _parse_date(value):
+        if not value:
+            return value
+        if isinstance(value, datetime):
+            return value
+        try:
+            return datetime.fromisoformat(value)
+        except Exception:
+            pass
+        formats = ['%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%d.%m.%Y %H:%M']
+        for fmt in formats:
+            try:
+                return datetime.strptime(value, fmt)
+            except Exception:
+                continue
+        return value
     
     for filename in os.listdir(UPLOAD_DIR):
         if filename.endswith('.json'):
@@ -527,7 +605,7 @@ def edit_file_sale(request, sale_id):
                     pass
     
     if not sale_data or not sale_file_path:
-        # notification removed
+        messages.error(request, 'Sale not found.')
         return redirect('index')
     
     if request.method == 'POST':
@@ -577,17 +655,18 @@ def edit_file_sale(request, sale_id):
                         update_xml_element(root, updated_data)
                     else:
                         for sale_elem in root.findall('sale'):
-                            if sale_elem.find('id').text == sale_id:
+                            id_elem = sale_elem.find('id')
+                            # Check if id_elem is not None before accessing .text
+                            if id_elem is not None and id_elem.text == sale_id:
                                 update_xml_element(sale_elem, updated_data)
                                 break
                     
                     tree.write(sale_file_path, encoding='utf-8', xml_declaration=True)
                 
-                # notification removed
+                messages.success(request, 'Sale updated successfully.')
                 return redirect('index')
             except Exception as e:
-                # notification removed
-                pass
+                messages.error(request, f'Error updating sale: {str(e)}')
     else:
         if isinstance(sale_data.get('sale_date'), str):
             try:
