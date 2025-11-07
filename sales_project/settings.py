@@ -21,6 +21,9 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # WhiteNoise should be placed directly after SecurityMiddleware to serve
+    # static files efficiently in production (Render, PythonAnywhere, etc.).
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -89,6 +92,10 @@ STATIC_ROOT = os.environ.get('STATIC_ROOT', BASE_DIR / 'staticfiles')
 STATICFILES_DIRS = [
     BASE_DIR / 'sales_data' / 'static',
 ]
+
+# Use WhiteNoise storage backend in production for compressed/cache-busted static files.
+# Requires `whitenoise` package and running `collectstatic` during deploy.
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
