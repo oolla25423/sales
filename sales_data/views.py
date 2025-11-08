@@ -90,11 +90,7 @@ def index(request):
                 tree = ET.parse(filepath)
                 root = tree.getroot()
                 
-                # Handle both formats:
-                # 1. Root is 'sale' with data as children (single sale file)
-                # 2. Root contains multiple 'sale' children (multiple sales file)
                 if root.tag == 'sale':
-                    # Single sale format - root is the sale element
                     sale_data = {}
                     for child in root:
                         if child.tag == 'sale_date' or child.tag == 'date' or child.tag == 'created_at':
@@ -113,7 +109,6 @@ def index(request):
                         sale_data['source'] = 'file'
                         sales_from_files.append(sale_data)
                 else:
-                    # Multiple sales format - root contains sale elements
                     for sale_elem in root.findall('sale'):
                         sale_data = {}
                         for child in sale_elem:
@@ -224,7 +219,7 @@ def add_sale(request):
                     if format_type == 'json':
                         with open(filepath, 'w', encoding='utf-8') as f:
                             json.dump(sale_data, f, indent=2, ensure_ascii=False)
-                    else:  # XML
+                    else:
                         root = ET.Element('sale')
                         for key, value in sale_data.items():
                             elem = ET.SubElement(root, key)
@@ -308,7 +303,7 @@ def delete_file(request, filename):
     return redirect('index')
 
 def delete_sale(request, sale_id):
-    deleted = False  # Initialize the variable
+    deleted = False
     try:
         for filename in os.listdir(UPLOAD_DIR):
             if filename.endswith('.json'):
@@ -362,19 +357,12 @@ def delete_sale(request, sale_id):
     return redirect('index')
 
 def search_sales(request):
-    """AJAX endpoint: возвращает список продаж в JSON.
-    Параметры:
-    - q: строка поиска
-    - source: 'database' | 'file' | 'all' (по умолчанию 'all')
-    Возвращает {'sales': [ ... ]} — список словарей с полями продажи.
-    """
     query = request.GET.get('q', '')
     source = request.GET.get('source', 'all')
     query_cf = query.casefold() if query else ''
 
     results = []
 
-    # Helper: matches search query against a sale dict-like object
     def matches(item):
         if not query_cf:
             return True
@@ -384,7 +372,6 @@ def search_sales(request):
             query_cf in str(item.get('customer_email', '') or '').casefold()
         )
     
-    # Date parsing helper
     def _parse_date(value):
         if not value:
             return value
@@ -402,7 +389,6 @@ def search_sales(request):
                 continue
         return value
 
-    # If source includes files, scan UPLOAD_DIR for JSON/XML and collect matching items
     if source in ('file', 'all'):
         try:
             for filename in os.listdir(UPLOAD_DIR):
@@ -429,11 +415,7 @@ def search_sales(request):
                         tree = ET.parse(filepath)
                         root = tree.getroot()
 
-                        # Handle both formats:
-                        # 1. Root is 'sale' with data as children (single sale file)
-                        # 2. Root contains multiple 'sale' children (multiple sales file)
                         if root.tag == 'sale':
-                            # Single sale format - root is the sale element
                             sale_data = {}
                             for child in root:
                                 if child.tag == 'sale_date' or child.tag == 'date' or child.tag == 'created_at':
@@ -448,7 +430,6 @@ def search_sales(request):
                                 sale_data['source'] = 'file'
                                 results.append(sale_data)
                         else:
-                            # Multiple sales format - root contains sale elements
                             for sale_elem in root.findall('sale'):
                                 sale_data = {}
                                 for child in sale_elem:
@@ -466,14 +447,11 @@ def search_sales(request):
                     except (ET.ParseError, IOError):
                         continue
         except Exception:
-            # не фатально — просто ничего не добавляем из файлов
             pass
 
-    # If source includes database, query Sale objects
     if source in ('database', 'all'):
         try:
             db_qs = Sale.objects.all()
-            # Если есть текст поиска — применим фильтрацию на уровне Python (оставлено для простоты)
             if query_cf:
                 db_qs = [s for s in db_qs if (
                     query_cf in (s.product_name or '').casefold() or
@@ -483,7 +461,6 @@ def search_sales(request):
 
             for s in db_qs:
                 d = s.to_dict()
-                # гарантируем, что sale_date — строка в ISO формате
                 try:
                     d['sale_date'] = s.sale_date.isoformat()
                 except Exception:
@@ -529,7 +506,6 @@ def edit_file_sale(request, sale_id):
     sale_file_path = None
     file_format = None
     
-    # Define _parse_date function for local use
     def _parse_date(value):
         if not value:
             return value
@@ -640,7 +616,7 @@ def edit_file_sale(request, sale_id):
                     
                     with open(sale_file_path, 'w', encoding='utf-8') as f:
                         json.dump(file_data, f, indent=2, ensure_ascii=False)
-                else:  # xml
+                else:
                     tree = ET.parse(sale_file_path)
                     root = tree.getroot()
                     
@@ -656,7 +632,6 @@ def edit_file_sale(request, sale_id):
                     else:
                         for sale_elem in root.findall('sale'):
                             id_elem = sale_elem.find('id')
-                            # Check if id_elem is not None before accessing .text
                             if id_elem is not None and id_elem.text == sale_id:
                                 update_xml_element(sale_elem, updated_data)
                                 break
