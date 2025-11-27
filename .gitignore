@@ -1,12 +1,12 @@
-# Byte-compiled / optimized / DLL files
+# Байт-скомпилированные / оптимизированные / DLL-файлы
 __pycache__/
 *.py[cod]
 *$py.class
 
-# C extensions
+# C-расширения
 *.so
 
-# Distribution / packaging
+# Дистрибуция / упаковка
 .Python
 build/
 develop-eggs/
@@ -26,16 +26,16 @@ wheels/
 MANIFEST
 
 # PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+# Обычно эти файлы генерируются Python-скриптом из шаблона
+# до сборки исполняемого файла PyInstaller, чтобы внедрить в него дату и другую информацию.
 *.manifest
 *.spec
 
-# Installer logs
+# Логи установщика
 pip-log.txt
 pip-delete-this-directory.txt
 
-# Unit test / coverage reports
+# Отчёты по модульным тестам / покрытию кода
 htmlcov/
 .tox/
 .nox/
@@ -49,25 +49,25 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
-# Translations
+# Переводы
 *.mo
 *.pot
 
-# Django stuff:
+# Специфичные для Django файлы:
 *.log
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
 media/
 
-# Flask stuff:
+# Специфичные для Flask файлы:
 instance/
 .webassets-cache
 
-# Scrapy stuff:
+# Специфичные для Scrapy файлы:
 .scrapy
 
-# Sphinx documentation
+# Документация Sphinx
 docs/_build/
 
 # PyBuilder
@@ -84,23 +84,23 @@ ipython_config.py
 .python-version
 
 # pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
+#   Согласно pypa/pipenv#598, рекомендуется включать Pipfile.lock в систему контроля версий.
+#   Однако при совместной работе, если используются платформозависимые зависимости
+#   или зависимости без кроссплатформенной поддержки, pipenv может установить
+#   неработающие зависимости или пропустить необходимые.
 #Pipfile.lock
 
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow
+# PEP 582; используется, например, github.com/David-OConnor/pyflow
 __pypackages__/
 
-# Celery stuff
+# Специфичные для Celery файлы
 celerybeat-schedule
 celerybeat.pid
 
-# SageMath parsed files
+# Обработанные файлы SageMath
 *.sage.py
 
-# Environments
+# Файлы окружений
 .env
 .env.local
 .env.*.local
@@ -111,14 +111,14 @@ ENV/
 env.bak/
 venv.bak/
 
-# Spyder project settings
+# Настройки проекта Spyder
 .spyderproject
 .spyproject
 
-# Rope project settings
+# Настройки проекта Rope
 .ropeproject
 
-# mkdocs documentation
+# Документация mkdocs
 /site
 
 # mypy
@@ -126,10 +126,10 @@ venv.bak/
 .dmypy.json
 dmypy.json
 
-# Pyre type checker
+# Проверка типов Pyre
 .pyre/
 
-# OS generated files
+# Файлы, создаваемые операционной системой
 .DS_Store
 .DS_Store?
 ._*
@@ -138,23 +138,23 @@ dmypy.json
 ehthumbs.db
 Thumbs.db
 
-# IDE specific files
+# Файлы, специфичные для IDE
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# Uploads directory
+# Папка загрузок
 uploads/
 
-# Static files directory
+# Папка статических файлов
 staticfiles/
 
-# Test files
+# Тестовые файлы
 test_*.json
 test_*.xml
 
-# Virtual Environment
+# Виртуальное окружение
 venv/
 env/
 ENV/
@@ -170,7 +170,7 @@ staticfiles/
 .vscode/
 .idea/
 
-# OS
+# ОС
 .DS_Store
 Thumbs.db
 
