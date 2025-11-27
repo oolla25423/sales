@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # PostgreSQL сервис
   db:
     image: postgres:15-alpine
     container_name: sales_postgres_db
@@ -23,7 +22,6 @@ services:
     networks:
       - sales_network
 
-  # Django приложение
   web:
     build:
       context: .
@@ -31,20 +29,15 @@ services:
     container_name: sales_web_app
     command: gunicorn sales_project.wsgi:application --bind 0.0.0.0:8000 --workers 3
     environment:
-      # Django конфигурация
       DEBUG: ${DEBUG:-False}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-change-me-in-production}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,web}
-      
-      # База данных
       DB_ENGINE: ${DB_ENGINE:-django.db.backends.postgresql}
       DB_NAME: ${DB_NAME:-sales_db}
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
       DB_HOST: ${DB_HOST:-db}
       DB_PORT: ${DB_PORT:-5432}
-      
-      # Статические файлы
       STATIC_ROOT: /app/staticfiles
       STATIC_URL: /static/
     volumes:
@@ -62,22 +55,6 @@ services:
     stdin_open: true
     tty: true
 
-  # Nginx для production (опционально)
-  nginx:
-    image: nginx:alpine
-    container_name: sales_nginx
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - static_volume:/app/staticfiles:ro
-      - media_volume:/app/uploads:ro
-    depends_on:
-      - web
-    restart: unless-stopped
-    networks:
-      - sales_network
-    profiles: ["production"]
 
 volumes:
   postgres_data:

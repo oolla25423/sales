@@ -60,7 +60,6 @@ def migrate_sqlite_to_postgres():
         print('Cancelled by user.')
         return False
 
-    # 1) Dumpdata from SQLite
     if DUMP_FILE.exists():
         print(f"Removing existing dump file: {DUMP_FILE}")
         DUMP_FILE.unlink()
@@ -77,14 +76,12 @@ def migrate_sqlite_to_postgres():
 
     print(f"Exported data to {DUMP_FILE}")
 
-    # 2) Apply migrations on Postgres
     env_postgres = {'DB_ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.postgresql')}
     print('\n2) Applying migrations on target (PostgreSQL) DB...')
     if not run_manage(['migrate'], extra_env=env_postgres):
         print('Migrations failed on target DB.')
         return False
 
-    # 3) Load data into Postgres
     print('\n3) Importing data into PostgreSQL...')
     if not run_manage(['loaddata', str(DUMP_FILE)], extra_env=env_postgres):
         print('Failed to import data into PostgreSQL.')
