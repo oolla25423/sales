@@ -1,13 +1,20 @@
 from pathlib import Path
 import os
+from dotenv import load_dotenv
+
+# Загружаем переменные окружения из .env файла
+load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-qt!4w=!5+^@ly1qu7qb!od%kqix6#q--59fhp!!nhm3+2=1=ql')
 
-DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
+# DEBUG должен быть False в production
+DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 't')
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'sales-rklu.onrender.com']
+# Расширяем ALLOWED_HOSTS из переменной окружения
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = [host.strip() for host in ALLOWED_HOSTS]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -52,13 +59,35 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'sales_project.wsgi.application'
 
+# Конфигурация базы данных - по умолчанию использовать PostgreSQL в контейнере
+# Для отката к SQLite явно указать DB_ENGINE=django.db.backends.sqlite3
+DB_ENGINE = os.environ.get('DB_ENGINE', 'django.db.backends.postgresql')
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+if DB_ENGINE == 'django.db.backends.sqlite3':
+    # PostgreSQL конфигурация
+    # SQLite конфигурация
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-}
+else:
+    # PostgreSQL конфигурация
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('DB_NAME', 'sales_db'),
+            'USER': os.environ.get('DB_USER', 'postgres'),
+            'PASSWORD': os.environ.get('DB_PASSWORD', 'postgres'),
+            'HOST': os.environ.get('DB_HOST', 'localhost'),
+            'PORT': os.environ.get('DB_PORT', '5432'),
+            'CONN_MAX_AGE': 600,
+            'OPTIONS': {
+                'connect_timeout': 10,
+            }
+        }
+    }
 
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -87,15 +116,19 @@ USE_TZ = True
 
 
 STATIC_URL = '/static/'
-STATIC_ROOT = os.environ.get('STATIC_ROOT', BASE_DIR / 'staticfiles')
+STATIC_ROOT = os.environ.get('STATIC_ROOT', str(BASE_DIR / 'staticfiles'))
 
-STATICFILES_DIRS = [
-    BASE_DIR / 'sales_data' / 'static',
-]
+STATICFILES_DIRS = []
+if os.path.exists(BASE_DIR / 'sales_data' / 'static'):
+    STATICFILES_DIRS.append(BASE_DIR / 'sales_data' / 'static')
 
 # Use WhiteNoise storage backend in production for compressed/cache-busted static files.
 # Requires `whitenoise` package and running `collectstatic` during deploy.
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Медиа файлы (для загруженных пользователем файлов)
+MEDIA_URL = '/uploads/'
+MEDIA_ROOT = os.environ.get('MEDIA_ROOT', str(BASE_DIR / 'uploads'))
 
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

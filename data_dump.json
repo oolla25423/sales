@@ -1,0 +1,1 @@
+[{"model": "sales_data.sale", "pk": "c50b4baa-effe-4a39-8d7b-b6c99cad424a", "fields": {"product_name": "Банан", "quantity": 21, "price": "100.00", "sale_date": "2025-08-04T13:10:00Z", "customer_name": "олег", "customer_email": "alshdfl@gmail.com"}}]

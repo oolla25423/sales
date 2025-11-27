@@ -103,6 +103,33 @@ class SaleForm(forms.Form):
         return email
 
 class SaleEditForm(forms.ModelForm):
+    # Явно задаём поле sale_date с форматами, совместимыми с HTML5 `datetime-local`.
+    sale_date = forms.DateTimeField(
+        label='Дата продажи',
+        input_formats=['%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%dT%H:%M:%S'],
+        widget=forms.DateTimeInput(
+            attrs={'type': 'datetime-local', 'class': 'form-control'},
+            format='%Y-%m-%dT%H:%M'
+        )
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # If editing existing instance, format initial sale_date for datetime-local input
+        try:
+            inst = kwargs.get('instance') or getattr(self, 'instance', None)
+            if inst and getattr(inst, 'sale_date', None):
+                dt = inst.sale_date
+                # If datetime has tzinfo, convert to local time to display, otherwise use as is
+                try:
+                    if dt.tzinfo is not None:
+                        dt = dt.astimezone()
+                except Exception:
+                    pass
+                self.initial['sale_date'] = dt.strftime('%Y-%m-%dT%H:%M')
+        except Exception:
+            pass
+
     class Meta:
         model = Sale
         fields = ['product_name', 'quantity', 'price', 'sale_date', 'customer_name', 'customer_email']
@@ -110,7 +137,7 @@ class SaleEditForm(forms.ModelForm):
             'product_name': forms.TextInput(attrs={'class': 'form-control'}),
             'quantity': forms.NumberInput(attrs={'class': 'form-control'}),
             'price': forms.NumberInput(attrs={'class': 'form-control'}),
-            'sale_date': forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'}),
+            # sale_date вынесено отдельно выше, чтобы задать формат корректно
             'customer_name': forms.TextInput(attrs={'class': 'form-control'}),
             'customer_email': forms.EmailInput(attrs={'class': 'form-control'}),
         }
